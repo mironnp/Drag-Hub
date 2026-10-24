@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 local Theme = {
@@ -17,13 +16,9 @@ local Theme = {
 }
 
 local TITLE = "Drag Hub"
-local TOGGLE_KEY = Enum.KeyCode.F11
+local TOGGLE_KEY = Enum.KeyCode.RightShift
 local TITLE_HEIGHT = 36
-local STATUS_HEIGHT = 22
 local SIDEBAR_WIDTH = 130
-local MIN_SIZE = Vector2.new(460, 300)
-local MAX_SIZE = Vector2.new(900, 640)
-local FADE = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 local function new(class, props, parent)
 	local inst = Instance.new(class)
@@ -59,32 +54,18 @@ ScreenGui.Destroying:Connect(function()
 	for _, c in ipairs(conns) do
 		c:Disconnect()
 	end
-	pcall(function()
-		RunService:UnbindFromRenderStep("DragHubMouse")
-	end)
 end)
 
-local Main = new("CanvasGroup", {
+local Main = new("Frame", {
 	Name = "Main",
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Size = UDim2.new(0, 560, 0, 380),
-	Position = UDim2.new(0.5, 0, 0.5, 0),
+	Size = UDim2.new(0, 560, 0, 360),
+	Position = UDim2.new(0.5, -280, 0.5, -180),
 	BackgroundColor3 = Theme.Background,
 	BorderSizePixel = 0,
-	GroupTransparency = 0,
 	Active = true,
 }, ScreenGui)
-new("UICorner", {CornerRadius = UDim.new(0, 6)}, Main)
+new("UICorner", {CornerRadius = UDim.new(0, 5)}, Main)
 new("UIStroke", {Color = Theme.Outline, Thickness = 1}, Main)
-local MainScale = new("UIScale", {Scale = 1}, Main)
-
-new("TextButton", {
-	Name = "Modal",
-	Text = "",
-	Modal = true,
-	Size = UDim2.new(0, 0, 0, 0),
-	BackgroundTransparency = 1,
-}, Main)
 
 local TitleBar = new("Frame", {
 	Name = "Title",
@@ -92,23 +73,24 @@ local TitleBar = new("Frame", {
 	BackgroundColor3 = Theme.Main,
 	BorderSizePixel = 0,
 }, Main)
+new("UICorner", {CornerRadius = UDim.new(0, 5)}, TitleBar)
+new("Frame", {
+	Size = UDim2.new(1, 0, 0, 6),
+	Position = UDim2.new(0, 0, 1, -6),
+	BackgroundColor3 = Theme.Main,
+	BorderSizePixel = 0,
+}, TitleBar)
 new("Frame", {
 	Size = UDim2.new(1, 0, 0, 1),
-	Position = UDim2.new(0, 0, 1, -1),
+	Position = UDim2.new(0, 0, 1, 0),
 	BackgroundColor3 = Theme.Outline,
 	BorderSizePixel = 0,
 }, TitleBar)
-local accentLine = new("Frame", {
+new("Frame", {
 	Size = UDim2.new(1, 0, 0, 2),
 	BackgroundColor3 = Theme.Accent,
 	BorderSizePixel = 0,
 }, TitleBar)
-new("UIGradient", {
-	Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Theme.Accent),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 140, 255)),
-	}),
-}, accentLine)
 
 new("TextLabel", {
 	Name = "NameHub",
@@ -133,7 +115,7 @@ local CloseBtn = new("TextButton", {
 	TextColor3 = Theme.Muted,
 }, TitleBar)
 CloseBtn.MouseEnter:Connect(function()
-	CloseBtn.TextColor3 = Color3.fromRGB(255, 90, 90)
+	CloseBtn.TextColor3 = Theme.Text
 end)
 CloseBtn.MouseLeave:Connect(function()
 	CloseBtn.TextColor3 = Theme.Muted
@@ -153,37 +135,10 @@ local OpenBtn = new("TextButton", {
 }, ScreenGui)
 new("UICorner", {CornerRadius = UDim.new(1, 0)}, OpenBtn)
 
-local hubOpen = true
-local animId = 0
-
 local function setHubVisible(state)
-	hubOpen = state
-	animId = animId + 1
-	local id = animId
-
-	if state then
-		Main.Visible = true
-		OpenBtn.Visible = false
-		TweenService:Create(Main, FADE, {GroupTransparency = 0}):Play()
-		TweenService:Create(MainScale, FADE, {Scale = 1}):Play()
-	else
-		TweenService:Create(Main, FADE, {GroupTransparency = 1}):Play()
-		TweenService:Create(MainScale, FADE, {Scale = 0.95}):Play()
-		task.delay(0.2, function()
-			if id == animId and not hubOpen then
-				Main.Visible = false
-				OpenBtn.Visible = UIS.TouchEnabled
-			end
-		end)
-	end
+	Main.Visible = state
+	OpenBtn.Visible = (not state) and UIS.TouchEnabled
 end
-
-RunService:BindToRenderStep("DragHubMouse", Enum.RenderPriority.Camera.Value + 1, function()
-	if hubOpen and Main.Visible then
-		UIS.MouseBehavior = Enum.MouseBehavior.Default
-		UIS.MouseIconEnabled = true
-	end
-end)
 
 CloseBtn.MouseButton1Click:Connect(function()
 	setHubVisible(false)
@@ -234,7 +189,7 @@ end)
 bind(UIS.InputBegan, function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == TOGGLE_KEY then
-		setHubVisible(not hubOpen)
+		setHubVisible(not Main.Visible)
 	end
 end)
 
@@ -254,16 +209,11 @@ bind(UIS.InputChanged, function(input)
 	if not dragging then return end
 	if input.UserInputType == Enum.UserInputType.MouseMovement
 		or input.UserInputType == Enum.UserInputType.Touch then
-		local screen = ScreenGui.AbsoluteSize
-		local offX = startPos.X.Offset + (input.Position.X - dragStart.X)
-		local offY = startPos.Y.Offset + (input.Position.Y - dragStart.Y)
-		local minX = 60 - startPos.X.Scale * screen.X
-		local maxX = (screen.X - 60) - startPos.X.Scale * screen.X
-		local minY = 20 - startPos.Y.Scale * screen.Y
-		local maxY = (screen.Y - 40) - startPos.Y.Scale * screen.Y
+		local dx = input.Position.X - dragStart.X
+		local dy = input.Position.Y - dragStart.Y
 		Main.Position = UDim2.new(
-			startPos.X.Scale, math.clamp(offX, minX, maxX),
-			startPos.Y.Scale, math.clamp(offY, minY, maxY)
+			startPos.X.Scale, startPos.X.Offset + dx,
+			startPos.Y.Scale, startPos.Y.Offset + dy
 		)
 	end
 end)
@@ -275,98 +225,23 @@ bind(UIS.InputEnded, function(input)
 	end
 end)
 
-local StatusBar = new("Frame", {
-	Name = "Status",
-	Size = UDim2.new(1, 0, 0, STATUS_HEIGHT),
-	Position = UDim2.new(0, 0, 1, -STATUS_HEIGHT),
-	BackgroundColor3 = Theme.Main,
-	BorderSizePixel = 0,
-}, Main)
-new("Frame", {
-	Size = UDim2.new(1, 0, 0, 1),
-	BackgroundColor3 = Theme.Outline,
-	BorderSizePixel = 0,
-}, StatusBar)
-new("TextLabel", {
-	Text = player.Name,
-	Size = UDim2.new(0.5, -10, 1, 0),
-	Position = UDim2.new(0, 10, 0, 0),
-	BackgroundTransparency = 1,
-	Font = Theme.Font,
-	TextSize = 12,
-	TextColor3 = Theme.Muted,
-	TextXAlignment = Enum.TextXAlignment.Left,
-}, StatusBar)
-new("TextLabel", {
-	Text = "[" .. TOGGLE_KEY.Name .. "] скрыть/показать",
-	Size = UDim2.new(0.5, -30, 1, 0),
-	Position = UDim2.new(0.5, 0, 0, 0),
-	BackgroundTransparency = 1,
-	Font = Theme.Font,
-	TextSize = 12,
-	TextColor3 = Theme.Muted,
-	TextXAlignment = Enum.TextXAlignment.Right,
-}, StatusBar)
-
-local Grip = new("TextButton", {
-	Name = "Grip",
-	Text = "",
-	Size = UDim2.new(0, 16, 0, 16),
-	Position = UDim2.new(1, -18, 0.5, -8),
-	BackgroundColor3 = Theme.Accent,
-	BackgroundTransparency = 0.6,
-	AutoButtonColor = false,
-}, StatusBar)
-new("UICorner", {CornerRadius = UDim.new(0, 4)}, Grip)
-Grip.MouseEnter:Connect(function()
-	Grip.BackgroundTransparency = 0.2
-end)
-Grip.MouseLeave:Connect(function()
-	Grip.BackgroundTransparency = 0.6
-end)
-
-local resizing, resizeStart, resizeSize, resizePos = false, nil, nil, nil
-Grip.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
-		resizing = true
-		resizeStart = input.Position
-		resizeSize = Main.Size
-		resizePos = Main.Position
-	end
-end)
-
-bind(UIS.InputChanged, function(input)
-	if not resizing then return end
-	if input.UserInputType == Enum.UserInputType.MouseMovement
-		or input.UserInputType == Enum.UserInputType.Touch then
-		local newW = math.clamp(resizeSize.X.Offset + (input.Position.X - resizeStart.X), MIN_SIZE.X, MAX_SIZE.X)
-		local newH = math.clamp(resizeSize.Y.Offset + (input.Position.Y - resizeStart.Y), MIN_SIZE.Y, MAX_SIZE.Y)
-		Main.Size = UDim2.new(0, newW, 0, newH)
-		Main.Position = UDim2.new(
-			resizePos.X.Scale, resizePos.X.Offset + (newW - resizeSize.X.Offset) / 2,
-			resizePos.Y.Scale, resizePos.Y.Offset + (newH - resizeSize.Y.Offset) / 2
-		)
-	end
-end)
-
-bind(UIS.InputEnded, function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
-		resizing = false
-	end
-end)
-
 local Sidebar = new("Frame", {
 	Name = "Sidebar",
-	Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -(TITLE_HEIGHT + STATUS_HEIGHT)),
-	Position = UDim2.new(0, 0, 0, TITLE_HEIGHT),
+	Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -(TITLE_HEIGHT + 1)),
+	Position = UDim2.new(0, 0, 0, TITLE_HEIGHT + 1),
 	BackgroundColor3 = Theme.Main,
 	BorderSizePixel = 0,
 }, Main)
+new("UICorner", {CornerRadius = UDim.new(0, 5)}, Sidebar)
+new("Frame", {
+	Size = UDim2.new(0, 8, 1, 0),
+	Position = UDim2.new(1, -8, 0, 0),
+	BackgroundColor3 = Theme.Main,
+	BorderSizePixel = 0,
+}, Sidebar)
 new("Frame", {
 	Size = UDim2.new(0, 1, 1, 0),
-	Position = UDim2.new(1, -1, 0, 0),
+	Position = UDim2.new(1, 0, 0, 0),
 	BackgroundColor3 = Theme.Outline,
 	BorderSizePixel = 0,
 }, Sidebar)
@@ -378,8 +253,8 @@ new("UIPadding", {PaddingTop = UDim.new(0, 8)}, Sidebar)
 
 local Content = new("Frame", {
 	Name = "Content",
-	Size = UDim2.new(1, -(SIDEBAR_WIDTH + 16), 1, -(TITLE_HEIGHT + STATUS_HEIGHT + 16)),
-	Position = UDim2.new(0, SIDEBAR_WIDTH + 8, 0, TITLE_HEIGHT + 8),
+	Size = UDim2.new(1, -(SIDEBAR_WIDTH + 17), 1, -(TITLE_HEIGHT + 17)),
+	Position = UDim2.new(0, SIDEBAR_WIDTH + 9, 0, TITLE_HEIGHT + 9),
 	BackgroundTransparency = 1,
 }, Main)
 
@@ -393,7 +268,6 @@ end
 local function selectTab(name)
 	for n, t in pairs(Tabs) do
 		local active = (n == name)
-		t.active = active
 		t.Page.Visible = active
 		t.TabButton.BackgroundTransparency = active and 0 or 1
 		t.TabButton.TextColor3 = active and Theme.Text or Theme.Muted
@@ -426,7 +300,7 @@ local function createPage(title)
 	new("UIStroke", {Color = Theme.Outline, Thickness = 1}, group)
 	new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, group)
 
-	local header = new("TextLabel", {
+	new("TextLabel", {
 		Name = "Header",
 		Text = title,
 		Size = UDim2.new(1, 0, 0, 28),
@@ -437,14 +311,7 @@ local function createPage(title)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		LayoutOrder = 1,
 	}, group)
-	new("UIPadding", {PaddingLeft = UDim.new(0, 22)}, header)
-	local dot = new("Frame", {
-		Size = UDim2.new(0, 6, 0, 6),
-		Position = UDim2.new(0, -14, 0.5, -3),
-		BackgroundColor3 = Theme.Accent,
-		BorderSizePixel = 0,
-	}, header)
-	new("UICorner", {CornerRadius = UDim.new(1, 0)}, dot)
+	new("UIPadding", {PaddingLeft = UDim.new(0, 10)}, group.Header)
 
 	new("Frame", {
 		Name = "Divider",
@@ -510,23 +377,13 @@ function Tab:Create(name, title)
 	}, tabBtn)
 
 	local page, items = createPage(title or name)
-	local tab = {Name = name, Page = page, Items = items, TabButton = tabBtn, Bar = bar, active = false}
+	local tab = {Name = name, Page = page, Items = items, TabButton = tabBtn, Bar = bar}
 	function tab:Button(text) return createButton(self.Items, text) end
 	function tab:Slider(...)  return createSlider(self.Items, ...) end
 	function tab:Toggle(...)  return createToggle(self.Items, ...) end
 
 	Tabs[name] = tab
 
-	tabBtn.MouseEnter:Connect(function()
-		if not tab.active then
-			tabBtn.BackgroundTransparency = 0.6
-		end
-	end)
-	tabBtn.MouseLeave:Connect(function()
-		if not tab.active then
-			tabBtn.BackgroundTransparency = 1
-		end
-	end)
 	tabBtn.MouseButton1Click:Connect(function()
 		selectTab(name)
 	end)
@@ -651,16 +508,6 @@ function createToggle(container, name, default)
 		end
 	end
 
-	btn.MouseEnter:Connect(function()
-		if not obj.Value then
-			label.TextColor3 = Theme.Text
-		end
-	end)
-	btn.MouseLeave:Connect(function()
-		if not obj.Value then
-			label.TextColor3 = Theme.Muted
-		end
-	end)
 	btn.MouseButton1Click:Connect(function()
 		setValue(not obj.Value)
 	end)
@@ -688,7 +535,7 @@ function createSlider(container, name, min, max, default)
 		LayoutOrder = nextOrder(),
 	}, container)
 
-	new("TextLabel", {
+	local label = new("TextLabel", {
 		Name = "Name",
 		Text = name or "Slider",
 		Size = UDim2.new(1, -60, 0, 16),
@@ -719,7 +566,7 @@ function createSlider(container, name, min, max, default)
 		Active = true,
 	}, root)
 	new("UICorner", {CornerRadius = UDim.new(0, 4)}, bar)
-	local barStroke = new("UIStroke", {Color = Theme.Outline, Thickness = 1}, bar)
+	new("UIStroke", {Color = Theme.Outline, Thickness = 1}, bar)
 
 	local fill = new("Frame", {
 		Name = "Fill",
@@ -751,20 +598,10 @@ function createSlider(container, name, min, max, default)
 		setValue(min + (max - min) * math.clamp(rel, 0, 1))
 	end
 
-	bar.MouseEnter:Connect(function()
-		barStroke.Color = Theme.Accent
-	end)
-	bar.MouseLeave:Connect(function()
-		if not sliding then
-			barStroke.Color = Theme.Outline
-		end
-	end)
-
 	bar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch then
 			sliding = true
-			barStroke.Color = Theme.Accent
 			fromInput(input)
 		end
 	end)
@@ -778,10 +615,7 @@ function createSlider(container, name, min, max, default)
 	local c2 = bind(UIS.InputEnded, function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch then
-			if sliding then
-				sliding = false
-				barStroke.Color = Theme.Outline
-			end
+			sliding = false
 		end
 	end)
 
